@@ -5,7 +5,7 @@ const connectToDB = async() => {
 
     try {
 
-        await mongoose.connect(`${process.env.MONGO_URI}/string_analyzer`)
+        await mongoose.connect(process.env.MONGO_URI)
         console.log("MongoDB connected Successfully")
 
     } catch (error) {
