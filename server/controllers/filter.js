@@ -1,5 +1,6 @@
 import StringAnalysis from "../model/str.js";
 
+
 const parseNaturalLanguageQuery = (query) => {
     const lower = query.toLowerCase();
     const filters = {};
@@ -30,11 +31,10 @@ const parseNaturalLanguageQuery = (query) => {
         filters.max_length = parseInt(exactMatch[1]);
     }
 
-
     const containsMatch = lower.match(/contain(?:s)?(?: the letter)?\s+([a-z])/);
     if (containsMatch) filters.contains_character = containsMatch[1];
 
-    // --- Heuristic: “first vowel” means letter 'a' ---
+
     if (lower.includes("first vowel")) {
         filters.contains_character = "a";
     }
@@ -47,13 +47,14 @@ export const filterByNaturalLanguage = async(req, res) => {
     try {
         const { query } = req.query;
 
-        // 🧩 Validate query parameter
+
         if (!query || typeof query !== "string" || query.trim().length === 0) {
             return res.status(400).json({
                 success: false,
                 message: "Missing or invalid 'query' parameter",
             });
         }
+
 
         const filters = parseNaturalLanguageQuery(query);
 
@@ -64,7 +65,6 @@ export const filterByNaturalLanguage = async(req, res) => {
                 interpreted_query: { original: query },
             });
         }
-
 
         const mongoQuery = {};
 
@@ -86,12 +86,28 @@ export const filterByNaturalLanguage = async(req, res) => {
             mongoQuery.value = new RegExp(filters.contains_character, "i");
         }
 
+        console.log("🧩 Parsed filters:", filters);
+        console.log("🧮 MongoDB Query:", JSON.stringify(mongoQuery, null, 2));
 
+        // Fetch matching records
         const results = await StringAnalysis.find(mongoQuery);
+
+
+        if (results.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No matching strings found.",
+                interpreted_query: {
+                    original: query,
+                    parsed_filters: filters,
+                },
+            });
+        }
 
 
         return res.status(200).json({
             success: true,
+            count: results.length,
             data: results.map((doc) => ({
                 value: doc.value,
                 properties: {
@@ -100,7 +116,6 @@ export const filterByNaturalLanguage = async(req, res) => {
                 },
                 created_at: doc.createdAt,
             })),
-            count: results.length,
             interpreted_query: {
                 original: query,
                 parsed_filters: filters,
